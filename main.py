@@ -253,7 +253,9 @@ class EmojiLikePlugin(Star):
         
         logger.debug(f"[QQ群贴表情监控插件] 解析到: user_id={user_id}, group_id={group_id}, emoji_id={emoji_id}, is_set={is_set}")
         
-        if not is_set: # 只监控贴表情，不监控取消贴表情
+        # 0. 检查取消贴表情的监控策略
+        unmonitor_strategy = self.config.get("unmonitor_emoji_like_strategy", "关闭监控取消贴表情事件")
+        if not is_set and unmonitor_strategy == "关闭监控取消贴表情事件":
             return
 
         # 监控机器人自身开关
@@ -347,10 +349,15 @@ class EmojiLikePlugin(Star):
 
         # 5. 格式化监控日志和消息
         # 日志始终显示完整内容
-        log_msg = f"{full_operator_info} 在 {full_group_info} 群中给消息“{display_content}”贴了一个 [表情{emoji_id}]"
+        action_text = "贴了一个" if is_set else "撤回了贴表情"
+        log_msg = f"{full_operator_info} 在 {full_group_info} 群中给消息“{display_content}”{action_text} [表情{emoji_id}]"
         logger.info(f"[QQ群贴表情监控插件] {log_msg}")
 
         # 6. 推送消息
+        # 取消贴表情时，根据策略决定是否推送消息
+        if not is_set and unmonitor_strategy == "在日志中推送":
+            return
+            
         # 推送时需要将 [表情id] 还原为 Face 组件，以便 QQ 原样显示
         push_list = self.config.get("push_list", [])
         logger.debug(f"[QQ群贴表情监控插件] 当前推送列表: {push_list}")
@@ -387,7 +394,7 @@ class EmojiLikePlugin(Star):
             
             if should_push:
                 chain = MessageChain()
-                chain.chain.append(Plain(f"{push_operator_info} 在 {push_group_info} 群中给消息“{display_content}”贴了一个"))
+                chain.chain.append(Plain(f"{push_operator_info} 在 {push_group_info} 群中对消息“{display_content}”{action_text}"))
                 chain.chain.append(Face(id=int(emoji_id)))
                 try:
                     await self.context.send_message(target_sid, chain)
