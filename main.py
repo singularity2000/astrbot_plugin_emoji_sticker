@@ -210,14 +210,19 @@ class EmojiLikePlugin(Star):
     async def on_notice(self, event: AiocqhttpMessageEvent):
         """监听通知事件 (贴表情)"""
         raw_event = event.message_obj.raw_message
+        logger.debug(f"[QQ群贴表情监控插件] 收到原始事件数据: {raw_event}")
         if not isinstance(raw_event, dict):
             return
             
         post_type = raw_event.get("post_type")
+        sub_type = raw_event.get("sub_type")
+        notice_type = raw_event.get("notice_type")
+        
+        logger.debug(f"[QQ群贴表情监控插件] post_type={post_type}, notice_type={notice_type}, sub_type={sub_type}")
+        
         if post_type != "notice":
             return
             
-        sub_type = raw_event.get("sub_type")
         # NapCat / OneBot V11 贴表情通常是 notice 事件，具体 sub_type 可能随实现而异。
         # 这里处理 'emoji_like' 事件
         if raw_event.get("notice_type") != "notify" or sub_type != "emoji_like":
@@ -230,12 +235,15 @@ class EmojiLikePlugin(Star):
         emoji_id = raw_event.get("emoji_id")
         is_set = raw_event.get("set", True)
         
+        logger.debug(f"[QQ群贴表情监控插件] 解析到: user_id={user_id}, group_id={group_id}, emoji_id={emoji_id}, is_set={is_set}")
+        
         if not is_set: # 只监控贴表情，不监控取消贴表情
             return
 
         # 监控机器人自身开关
         self_id = str(event.message_obj.self_id)
         if user_id == self_id and not self.config.get("monitor_self", False):
+            logger.debug(f"[QQ群贴表情监控插件] 忽略机器人自身贴表情: {user_id}")
             return
 
         # 会话 SID
@@ -246,31 +254,41 @@ class EmojiLikePlugin(Star):
         whitelist = self.config.get("whitelist", [])
         
         if current_session_sid in blacklist:
+            logger.debug(f"[QQ群贴表情监控插件] SID {current_session_sid} 在黑名单中")
             return
         if whitelist and current_session_sid not in whitelist:
+            logger.debug(f"[QQ群贴表情监控插件] SID {current_session_sid} 不在白名单中")
             return
 
         # 3. 获取相关人员信息和被贴消息内容
         # 获取贴表情者的信息
-        operator_info = await event.bot.get_group_member_info(group_id=int(group_id), user_id=int(user_id))
-        nickname = operator_info.get("nickname", "未知")
-        card = operator_info.get("card", "")
-        operator_name = f"{nickname}（{card}）" if card else nickname
+        try:
+            operator_info = await event.bot.get_group_member_info(group_id=int(group_id), user_id=int(user_id))
+            nickname = operator_info.get("nickname", "未知")
+            card = operator_info.get("card", "")
+            operator_name = f"{nickname}（{card}）" if card else nickname
+        except Exception as e:
+            logger.error(f"[QQ群贴表情监控插件] 获取群成员信息失败: {e}")
+            operator_name = f"未知({user_id})"
         
         # 获取被贴消息内容
-        msg_info = await event.bot.get_msg(message_id=message_id)
-        msg_data = msg_info.get("message", [])
-        content = ""
-        if isinstance(msg_data, str):
-            content = msg_data
-        elif isinstance(msg_data, list):
-            for seg in msg_data:
-                if seg.get("type") == "text":
-                    content += seg.get("data", {}).get("text", "")
-                elif seg.get("type") == "face":
-                    content += f"[表情{seg.get('data', {}).get('id')}]"
-                else:
-                    content += f"[{seg.get('type')}]"
+        try:
+            msg_info = await event.bot.get_msg(message_id=message_id)
+            msg_data = msg_info.get("message", [])
+            content = ""
+            if isinstance(msg_data, str):
+                content = msg_data
+            elif isinstance(msg_data, list):
+                for seg in msg_data:
+                    if seg.get("type") == "text":
+                        content += seg.get("data", {}).get("text", "")
+                    elif seg.get("type") == "face":
+                        content += f"[表情{seg.get('data', {}).get('id')}]"
+                    else:
+                        content += f"[{seg.get('type')}]"
+        except Exception as e:
+            logger.error(f"[QQ群贴表情监控插件] 获取消息内容失败: {e}")
+            content = "未知消息内容"
         
         # 4. 消息折叠处理
         fold_threshold = self.config.get("msg_fold_threshold", 0)
@@ -288,6 +306,7 @@ class EmojiLikePlugin(Star):
         # 6. 推送消息
         # 推送时需要将 [表情id] 还原为 Face 组件，以便 QQ 原样显示
         push_list = self.config.get("push_list", [])
+        logger.debug(f"[QQ群贴表情监控插件] 当前推送列表: {push_list}")
         for push_item in push_list:
             # 解析推送规则
             # 格式可能为：
@@ -298,6 +317,7 @@ class EmojiLikePlugin(Star):
             # 目标 SID 必定包含前三段，之后可能有冒号跟随来源列表
             match = re.match(r'^((?:[^:]+:){2}[^:]+)(?::(.*))?$', push_item)
             if not match:
+                logger.debug(f"[QQ群贴表情监控插件] 推送项格式不匹配: {push_item}")
                 continue
                 
             target_sid = match.group(1)
@@ -307,18 +327,26 @@ class EmojiLikePlugin(Star):
             if not sources_part:
                 # 全局推送：只要消息在全局范围内（通过了黑白名单过滤），就推送
                 should_push = True
+                logger.debug(f"[QQ群贴表情监控插件] 推送项 {push_item} 为全局推送，目标: {target_sid}")
             else:
                 # 特定来源推送
                 source_sids = [s.strip() for s in sources_part.split(",")]
                 # 检查当前会话 SID 或纯数字群号是否在来源列表中
                 if current_session_sid in source_sids or group_id in source_sids:
                     should_push = True
+                    logger.debug(f"[QQ群贴表情监控插件] 推送项 {push_item} 匹配到来源: {current_session_sid}")
+                else:
+                    logger.debug(f"[QQ群贴表情监控插件] 推送项 {push_item} 未匹配到来源: {current_session_sid}")
             
             if should_push:
                 chain = MessageChain()
                 chain.chain.append(Plain(f"{operator_name}在群{group_id}中给消息“{display_content}”贴了一个"))
                 chain.chain.append(Face(id=int(emoji_id)))
-                await self.context.send_message(target_sid, chain)
+                try:
+                    await self.context.send_message(target_sid, chain)
+                    logger.debug(f"[QQ群贴表情监控插件] 已发送推送至 {target_sid}")
+                except Exception as e:
+                    logger.error(f"[QQ群贴表情监控插件] 发送推送消息失败: {e}")
 
     async def judge_emotion(
         self,
