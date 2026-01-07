@@ -223,17 +223,33 @@ class EmojiLikePlugin(Star):
         if post_type != "notice":
             return
             
-        # NapCat / OneBot V11 贴表情通常是 notice 事件，具体 sub_type 可能随实现而异。
-        # 这里处理 'emoji_like' 事件
-        if raw_event.get("notice_type") != "notify" or sub_type != "emoji_like":
+        # NapCat / OneBot V11 贴表情通知适配
+        # 常见 notice_type: 'notify' (且 sub_type='emoji_like') 或 'group_msg_emoji_like'
+        is_emoji_like = False
+        emoji_id = None
+        is_set = True
+        
+        if notice_type == "notify" and sub_type == "emoji_like":
+            is_emoji_like = True
+            emoji_id = raw_event.get("emoji_id")
+            is_set = raw_event.get("set", True)
+        elif notice_type == "group_msg_emoji_like":
+            is_emoji_like = True
+            # group_msg_emoji_like 格式中可能是 likes 列表
+            likes = raw_event.get("likes", [])
+            if likes and isinstance(likes, list):
+                emoji_id = likes[0].get("emoji_id")
+            else:
+                emoji_id = raw_event.get("emoji_id")
+            is_set = raw_event.get("is_add", raw_event.get("set", True))
+
+        if not is_emoji_like:
             return
             
         # 1. 获取基础信息
         user_id = str(raw_event.get("user_id"))
         group_id = str(raw_event.get("group_id"))
         message_id = str(raw_event.get("message_id"))
-        emoji_id = raw_event.get("emoji_id")
-        is_set = raw_event.get("set", True)
         
         logger.debug(f"[QQ群贴表情监控插件] 解析到: user_id={user_id}, group_id={group_id}, emoji_id={emoji_id}, is_set={is_set}")
         
