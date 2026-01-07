@@ -1,0 +1,6 @@
+name: astrbot_plugin_emoji_sticker
+display_name: QQ群贴表情监控插件
+desc: QQ群贴表情监控插件。
+version: 1.0.0
+author: Singularity2000
+repo: https://github.com/Singularity2000/astrbot_plugin_emoji_sticker

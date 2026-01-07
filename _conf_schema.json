@@ -1,0 +1,109 @@
+{
+    "emoji_follow": {
+        "description": "表情跟随概率",
+        "hint": "用户的消息中含有表情时，bot将按概率自动为这条消息贴上对应的表情",
+        "type": "float",
+        "slider": {
+            "min": 0,
+            "max": 1,
+            "step": 0.001
+        },
+        "default": 0.3
+    },
+    "emoji_like_prob": {
+        "description": "对消息贴表情的概率",
+        "hint": "设太高群友会很烦，设太低则难以触发贴表情.(补充: 对于唤醒Bot的消息插件已自动忽略，以防对唤醒造成干扰)",
+        "type": "float",
+        "slider": {
+            "min": 0,
+            "max": 1,
+            "step": 0.001
+        },
+        "default": 0.03
+    },
+    "emoji_select_strategy": {
+        "description": "表情选用策略",
+        "type": "string",
+        "hint": "random: 随机选择一个表情。emotion_llm: 调用 LLM 根据情感来选",
+        "options": [
+            "random",
+            "emotion_llm"
+        ],
+        "default": "emotion_llm"
+    },
+    "judge_provider_id": {
+        "description": "判断情感用的LLM提供商",
+        "type": "string",
+        "default": "",
+        "hint": "策略选为‘emotion_llm’时此项生效。留空或者填写的提供商不存在时，则使用当前正在使用的LLM提供商。 tip:工作较为简单，建议用稳定的智谱",
+        "_special": "select_provider"
+    },
+    "emoji_interval": {
+        "description": "贴表情的时间间隔（秒）",
+        "hint": "贴多个表情时，每个表情之间的时间间隔，适当间隔比较自然，符合真人感",
+        "type": "float",
+        "slider": {
+            "min": 0,
+            "max": 3,
+            "step": 0.1
+        },
+        "default": 0.4
+    },
+    "emotions_mapping": {
+        "description": "情感映射表",
+        "hint": "根据情感关键词映射到表情ID(采用列表模式进行编辑)，如果你不清楚各个ID所对应的表情，请使用 astrbot_plugin_multimsg 插件查看，命令为：face <ID范围>",
+        "type": "list",
+        "default": [
+            "开心：2 74 109 272 295 305 318 319 324 339",
+            "得意：4 16 28 29 99 101 178 269 270 277 283 299 307 336 426",
+            "害羞：6 20 21",
+            "难过：5 34 35 36 37 173 264 265 267 425",
+            "纠结：106 176 262 263 270",
+            "生气：11 26 31 105",
+            "惊讶：3 325",
+            "疑惑：32 268",
+            "恳求：111 353",
+            "可怕：1 286",
+            "尴尬：100 306 342 344 347",
+            "无语：46 97 181 271 281 284 287 312 352 357 427",
+            "恶心：19 59 323",
+            "无聊：8 25 285 293"
+        ]
+    },
+    "default_emoji_num": {
+        "description": "命令默认贴表情数量",
+        "type": "int",
+        "default": 1,
+        "hint": "使用“贴表情”命令且未指定数量时，默认贴的表情数量（正整数，若填写不当则一律贴1个）"
+    },
+    "monitor_self": {
+        "description": "监控机器人自身的贴表情行为",
+        "type": "bool",
+        "default": false,
+        "hint": "是否监控并记录机器人自己贴表情的行为"
+    },
+    "blacklist": {
+        "description": "黑名单（不监控的会话）",
+        "type": "list",
+        "default": [],
+        "hint": "填入会话 SID，例如 napcat:GroupMessage:12345678"
+    },
+    "whitelist": {
+        "description": "白名单（只监控的会话）",
+        "type": "list",
+        "default": [],
+        "hint": "填入会话 SID，例如 napcat:GroupMessage:12345678。若黑白名单均为空则监控所有。"
+    },
+    "push_list": {
+        "description": "监控信息推送设置",
+        "type": "list",
+        "default": [],
+        "hint": "格式：推送目标SID:来源SID1,来源SID2...。例如：napcat:GroupMessage:12345678 代表推送全局监控信息到该群。"
+    },
+    "msg_fold_threshold": {
+        "description": "消息折叠字数阈值",
+        "type": "int",
+        "default": 0,
+        "hint": "正整数。若填0或非正整数则不折叠。"
+    }
+}
