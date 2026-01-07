@@ -276,16 +276,46 @@ class EmojiLikePlugin(Star):
             logger.debug(f"[QQ群贴表情监控插件] SID {current_session_sid} 不在白名单中")
             return
 
-        # 3. 获取相关人员信息和被贴消息内容
+        # 3. 获取相关人员信息、群信息和被贴消息内容
         # 获取贴表情者的信息
         try:
             operator_info = await event.bot.get_group_member_info(group_id=int(group_id), user_id=int(user_id))
             nickname = operator_info.get("nickname", "未知")
             card = operator_info.get("card", "")
-            operator_name = f"{nickname}（{card}）" if card else nickname
+            # 日志始终显示完整信息：nickname (card) (user_id)
+            full_operator_name = f"{nickname} ({card})" if card else nickname
+            full_operator_info = f"{full_operator_name} ({user_id})"
+            
+            # 推送显示方式
+            op_display_mode = self.config.get("operator_display_mode", "全部显示")
+            if op_display_mode == "仅显示昵称和群名片":
+                push_operator_info = full_operator_name
+            elif op_display_mode == "仅显示QQ号":
+                push_operator_info = user_id
+            else: # 全部显示
+                push_operator_info = full_operator_info
         except Exception as e:
             logger.error(f"[QQ群贴表情监控插件] 获取群成员信息失败: {e}")
-            operator_name = f"未知({user_id})"
+            full_operator_info = push_operator_info = f"未知 ({user_id})"
+        
+        # 获取群信息
+        try:
+            group_info = await event.bot.get_group_info(group_id=int(group_id))
+            group_name = group_info.get("group_name", "未知群聊")
+            # 日志始终显示完整信息：“group_name” (group_id)
+            full_group_info = f"“{group_name}” ({group_id})"
+            
+            # 推送显示方式
+            group_display_mode = self.config.get("group_display_mode", "全部显示")
+            if group_display_mode == "仅显示群名":
+                push_group_info = f"“{group_name}”"
+            elif group_display_mode == "仅显示群号":
+                push_group_info = group_id
+            else: # 全部显示
+                push_group_info = full_group_info
+        except Exception as e:
+            logger.error(f"[QQ群贴表情监控插件] 获取群信息失败: {e}")
+            full_group_info = push_group_info = f"({group_id})"
         
         # 获取被贴消息内容
         try:
@@ -316,7 +346,8 @@ class EmojiLikePlugin(Star):
             display_content = content[:fold_threshold] + "……"
 
         # 5. 格式化监控日志和消息
-        log_msg = f"{operator_name}在群{group_id}中给消息“{display_content}”贴了一个[表情{emoji_id}]"
+        # 日志始终显示完整内容
+        log_msg = f"{full_operator_info} 在 {full_group_info} 群中给消息“{display_content}”贴了一个 [表情{emoji_id}]"
         logger.info(f"[QQ群贴表情监控插件] {log_msg}")
 
         # 6. 推送消息
@@ -356,7 +387,7 @@ class EmojiLikePlugin(Star):
             
             if should_push:
                 chain = MessageChain()
-                chain.chain.append(Plain(f"{operator_name}在群{group_id}中给消息“{display_content}”贴了一个"))
+                chain.chain.append(Plain(f"{push_operator_info} 在 {push_group_info} 群中给消息“{display_content}”贴了一个"))
                 chain.chain.append(Face(id=int(emoji_id)))
                 try:
                     await self.context.send_message(target_sid, chain)
