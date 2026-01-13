@@ -395,7 +395,11 @@ class EmojiLikePlugin(Star):
             if should_push:
                 chain = MessageChain()
                 chain.chain.append(Plain(f"{push_operator_info} 在 {push_group_info} 群中对消息“{display_content}”{action_text}"))
-                chain.chain.append(Face(id=int(emoji_id)))
+                eid = int(emoji_id)
+                if eid > 1000:
+                    chain.chain.append(Plain(chr(eid)))
+                else:
+                    chain.chain.append(Face(id=eid))
                 try:
                     await self.context.send_message(target_sid, chain)
                     logger.debug(f"[QQ群贴表情监控插件] 已发送推送至 {target_sid}")
